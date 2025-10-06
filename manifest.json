@@ -1,0 +1,10 @@
+{
+	"id": "machine-tracker",
+	"name": "Machine Tracker",
+	"version": "1.0.0",
+	"minAppVersion": "0.12.0",
+	"description": "An Obsidian plugin for managing HackTheBox machines, challenges, and Sherlocks.",
+	"author": "C1trus",
+	"authorUrl": "",
+	"isDesktopOnly": false
+}

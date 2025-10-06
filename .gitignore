@@ -1,0 +1,51 @@
+# vscode
+.vscode 
+
+# Intellij
+*.iml
+.idea
+
+# npm
+node_modules
+
+# Don't include the compiled main.js file in the repo.
+# They should be uploaded to GitHub releases instead.
+main.js
+
+# Exclude sourcemaps
+*.map
+
+# obsidian
+data.json
+
+# Exclude macOS Finder (System Explorer) View States
+.DS_Store
+
+# VitePress documentation build
+doc/.vitepress/dist
+doc/.vitepress/cache
+
+# Development and temporary files
+ai/
+test/
+yaml字段/
+*.tmp
+*.temp
+
+# Development documentation (optional, comment out if you want to keep these)
+*_SUMMARY.md
+*_PLAN.md
+*_IMPLEMENTATION*.md
+*_COMPARISON.md
+*_GUIDE.md
+*_EXAMPLE.md
+
+# Windows specific
+Thumbs.db
+desktop.ini
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
