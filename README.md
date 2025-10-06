@@ -2,7 +2,9 @@
 
 **一款能够快速生成HTB渗透测试笔记模版的Obsidian 插件，有助于对您的知识库进行管理查询**
 
-![Demo](assets/PixPin_2025-10-07_04-32-33.gif)
+<p align="center">
+  <img src="assets/PixPin_2025-10-07_04-32-33.gif" alt="Demo" width="600">
+</p>
 
 轻松管理和追踪 [HackTheBox](https://hackthebox.com) 平台上的学习进度
 

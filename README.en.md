@@ -2,7 +2,9 @@
 
 **An Obsidian plugin that quickly generates HTB penetration testing note templates to help manage and query your knowledge vault**
 
-![Demo](assets/PixPin_2025-10-07_04-32-33.gif)
+<p align="center">
+  <img src="assets/PixPin_2025-10-07_04-32-33.gif" alt="Demo" width="600">
+</p>
 
 Easily manage and track your learning progress on [HackTheBox](https://hackthebox.com)
 
