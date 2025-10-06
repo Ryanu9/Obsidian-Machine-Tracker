@@ -65,7 +65,10 @@ Machine Tracker 是一款 Obsidian 插件，帮助您在知识库中系统化管
 ### 3. 自定义模板（可选）
 
 默认使用内置模版，且默认为全字段（方便您自己选择自己想要的内容）请**删除您不需要的字段**，或者添加您想要的其他自定义字段，制作好适合您的模版
-![Template Config](assets/Pasted%20image%2020251007042205.png)
+
+<p align="center">
+  <img src="assets/Pasted%20image%2020251007042205.png" alt="Template Config" width="700">
+</p>
 
 ---
 
@@ -82,7 +85,10 @@ A: 可以，在插件设置中完全自定义 YAML 模板。
 
 **Q: 如何为每个文件夹下单独配置模版？**  
 A: 开启下方的文件模版
-![Folder Template](assets/image-20251007042512657.png)
+
+<p align="center">
+  <img src="assets/image-20251007042512657.png" alt="Folder Template" width="700">
+</p>
 
 ---
 

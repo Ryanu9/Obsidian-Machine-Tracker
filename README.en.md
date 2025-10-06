@@ -65,7 +65,10 @@ Visit [HackTheBox Settings](https://app.hackthebox.com/profile/settings) to crea
 ### 3. Customize Templates (Optional)
 
 The plugin uses built-in templates by default with all fields (for your convenience to choose the content you want). Please **delete the fields you don't need** or add other custom fields you want to create a template that suits you.
-![Template Config](assets/Pasted%20image%2020251007042205.png)
+
+<p align="center">
+  <img src="assets/Pasted%20image%2020251007042205.png" alt="Template Config" width="700">
+</p>
 
 ---
 
@@ -82,7 +85,10 @@ A: Yes, you can fully customize YAML templates in plugin settings.
 
 **Q: How to configure separate templates for each folder?**  
 A: Enable folder templates below
-![Folder Template](assets/image-20251007042512657.png)
+
+<p align="center">
+  <img src="assets/image-20251007042512657.png" alt="Folder Template" width="700">
+</p>
 
 ---
 
