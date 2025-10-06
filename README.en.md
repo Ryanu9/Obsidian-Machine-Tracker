@@ -1,6 +1,3 @@
-<div align="center">
-
-
 # 🎯 Machine Tracker
 
 **An Obsidian plugin that quickly generates HTB penetration testing note templates to help manage and query your knowledge vault**

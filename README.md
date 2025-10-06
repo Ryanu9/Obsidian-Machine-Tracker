@@ -1,6 +1,3 @@
-<div align="center">
-
-
 # 🎯 Machine Tracker
 
 **一款能够快速生成HTB渗透测试笔记模版的Obsidian 插件，有助于对您的知识库进行管理查询**
