@@ -103,16 +103,24 @@ export default class HTBPlugin extends Plugin {
 
 			this.showStatus(i18nHelper.getMessage('htb_loading'));
 
-			// Prompt user for save location
+			// Prompt user for save location (使用上次记忆的文件夹路径)
 			const fileName = this.generateFileName(machine);
-			const saveLocation = await this.promptForSaveLocation(this.settings.defaultDataFilePath, fileName);
+			const defaultFolder = this.settings.lastMachineFolderPath || this.settings.defaultDataFilePath;
+			const saveLocation = await this.promptForSaveLocation(defaultFolder, fileName);
 			if (!saveLocation) {
 				return; // User cancelled
 			}
-			
+
+			// 保存用户选择的文件夹路径
+			const folderPath = saveLocation.substring(0, saveLocation.lastIndexOf('/'));
+			if (folderPath !== this.settings.lastMachineFolderPath) {
+				this.settings.lastMachineFolderPath = folderPath;
+				await this.saveSettings();
+			}
+
 			// Generate content from template (需要目标路径以匹配文件夹模板)
 			const content = await this.machineHandler.generateContent(machine, saveLocation);
-			
+
 			await this.fileHandler.createNewNoteWithData(saveLocation, content, this.settings.openAfterCreate);
 
 			this.showStatus(i18nHelper.getMessage('htb_created', machine.name));
@@ -146,16 +154,24 @@ export default class HTBPlugin extends Plugin {
 
 			this.showStatus(i18nHelper.getMessage('htb_loading'));
 
-			// Prompt user for save location
+			// Prompt user for save location (使用上次记忆的文件夹路径)
 			const fileName = this.generateChallengeFileName(challenge);
-			const saveLocation = await this.promptForSaveLocation(this.settings.defaultDataFilePath, fileName);
+			const defaultFolder = this.settings.lastChallengeFolderPath || this.settings.defaultDataFilePath;
+			const saveLocation = await this.promptForSaveLocation(defaultFolder, fileName);
 			if (!saveLocation) {
 				return; // User cancelled
 			}
-			
+
+			// 保存用户选择的文件夹路径
+			const folderPath = saveLocation.substring(0, saveLocation.lastIndexOf('/'));
+			if (folderPath !== this.settings.lastChallengeFolderPath) {
+				this.settings.lastChallengeFolderPath = folderPath;
+				await this.saveSettings();
+			}
+
 			// Generate content from template (需要目标路径以匹配文件夹模板)
 			const content = await this.challengeHandler.generateContent(challenge, saveLocation);
-			
+
 			await this.fileHandler.createNewNoteWithData(saveLocation, content, this.settings.openAfterCreate);
 
 			this.showStatus(i18nHelper.getMessage('htb_created', challenge.name));
@@ -189,16 +205,24 @@ export default class HTBPlugin extends Plugin {
 
 			this.showStatus(i18nHelper.getMessage('htb_loading'));
 
-			// Prompt user for save location
+			// Prompt user for save location (使用上次记忆的文件夹路径)
 			const fileName = this.generateSherlockFileName(sherlock);
-			const saveLocation = await this.promptForSaveLocation(this.settings.defaultDataFilePath, fileName);
+			const defaultFolder = this.settings.lastSherlockFolderPath || this.settings.defaultDataFilePath;
+			const saveLocation = await this.promptForSaveLocation(defaultFolder, fileName);
 			if (!saveLocation) {
 				return; // User cancelled
 			}
-			
+
+			// 保存用户选择的文件夹路径
+			const folderPath = saveLocation.substring(0, saveLocation.lastIndexOf('/'));
+			if (folderPath !== this.settings.lastSherlockFolderPath) {
+				this.settings.lastSherlockFolderPath = folderPath;
+				await this.saveSettings();
+			}
+
 			// Generate content from template
 			const content = await this.sherlockHandler.generateContent(sherlock, saveLocation);
-			
+
 			await this.fileHandler.createNewNoteWithData(saveLocation, content, this.settings.openAfterCreate);
 
 			this.showStatus(i18nHelper.getMessage('htb_created', sherlock.name));
@@ -350,10 +374,10 @@ class FolderSelectorModal extends Modal {
 						this.folderPath = value;
 						this.updatePreview();
 					});
-				
+
 				// 创建 FolderSuggest 实例
 				this.folderSuggest = new FolderSuggest(this.app, text);
-				
+
 				// 添加 Enter 键处理
 				text.inputEl.addEventListener("keydown", (event) => {
 					if (event.key === "Enter" && !this.folderSuggest.isVisible()) {
@@ -361,7 +385,7 @@ class FolderSelectorModal extends Modal {
 						this.submit();
 					}
 				});
-				
+
 				// 自动聚焦
 				setTimeout(() => text.inputEl.focus(), 10);
 			});
@@ -397,7 +421,7 @@ class FolderSelectorModal extends Modal {
 
 	updatePreview() {
 		if (!this.previewEl) return;
-		
+
 		this.previewEl.empty();
 		const fullPath = this.folderPath ? `${this.folderPath}/${this.fileName}` : this.fileName;
 		this.previewEl.createEl("strong", { text: "完整路径: " });

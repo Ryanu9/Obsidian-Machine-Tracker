@@ -6,14 +6,14 @@ export interface FolderTemplateRule {
 	name: string;                 // 规则名称（便于识别）
 	enabled: boolean;             // 是否启用
 	priority: number;             // 优先级 (数字越大优先级越高)
-	
+
 	// 文件夹路径匹配规则
 	folderPath: string;           // 目标文件夹路径，例如: "HTB/Easy" 或 "HTB/Linux/Hard"
 	matchSubfolders: boolean;     // 是否匹配子文件夹（默认 true）
-	
+
 	// 文件名模板
 	fileNameTemplate?: string;    // 文件名模板，例如: "{{name}}" 或 "{{name}}-{{difficulty}}"
-	
+
 	// 模板配置
 	useBuiltInTemplate: boolean;  // 是否使用内置模板（默认 true）
 	templateFile?: string;        // 外部模板文件路径
@@ -30,7 +30,7 @@ export interface TypeTemplateSettings {
 	useDefaultBuiltInTemplate: boolean; // 是否使用内置默认模板（默认 true）
 	defaultTemplateFile: string;      // 外部默认模板文件路径
 	defaultTemplateContent: string;   // 内置默认模板内容
-	
+
 	// 文件夹模板规则
 	folderTemplateRules: FolderTemplateRule[];
 	enableFolderTemplates: boolean;  // 是否启用文件夹模板
@@ -51,7 +51,7 @@ export interface HTBPluginSettings {
 	useDefaultBuiltInTemplate: boolean; // 是否使用内置默认模板（默认 true）
 	defaultTemplateFile: string;      // 外部默认模板文件路径
 	defaultTemplateContent: string;   // 内置默认模板内容
-	
+
 	// 文件夹模板规则（旧版兼容）
 	folderTemplateRules: FolderTemplateRule[];
 	enableFolderTemplates: boolean;  // 是否启用文件夹模板
@@ -76,6 +76,11 @@ export interface HTBPluginSettings {
 	// Advanced Settings
 	debug: boolean;
 	timeout: number;
+
+	// 记住上次选择的文件夹路径
+	lastMachineFolderPath?: string;
+	lastChallengeFolderPath?: string;
+	lastSherlockFolderPath?: string;
 }
 
 /**
@@ -620,7 +625,7 @@ export const TEMPLATE_FIELDS: TemplateField[] = [
 	{ field: "{{url}}", description: "机器详情页 URL", example: "https://app.hackthebox.com/machines/298", applicableTo: "Machine" },
 	{ field: "{{OS}}", description: "操作系统", example: "Linux / Windows / FreeBSD", applicableTo: "Machine" },
 	{ field: "{{os}}", description: "操作系统（同 OS）", example: "Linux", applicableTo: "Machine" },
-	
+
 	// 难度与评分
 	{ field: "{{difficulty}}", description: "难度等级文本", example: "Easy / Medium / Hard / Insane", applicableTo: "Machine" },
 	{ field: "{{difficultyText}}", description: "难度等级文本（同 difficulty）", example: "Easy", applicableTo: "Machine" },
@@ -629,7 +634,7 @@ export const TEMPLATE_FIELDS: TemplateField[] = [
 	{ field: "{{score}}", description: "用户评分（同 rating）", example: "4.2", applicableTo: "Machine" },
 	{ field: "{{stars}}", description: "星级评分（原始数值）", example: "4.2", applicableTo: "Machine" },
 	{ field: "{{scoreStar}}", description: "星级评分（星星图标）", example: "⭐⭐⭐⭐", applicableTo: "Machine" },
-	
+
 	// 状态信息
 	{ field: "{{active}}", description: "是否为活跃机器", example: "true / false", applicableTo: "Machine" },
 	{ field: "{{retired}}", description: "退役状态文本", example: "已退役 / 活跃中", applicableTo: "Machine" },
@@ -637,12 +642,12 @@ export const TEMPLATE_FIELDS: TemplateField[] = [
 	{ field: "{{free}}", description: "是否免费（VIP 限制）", example: "true / false", applicableTo: "Machine" },
 	{ field: "{{isCompleted}}", description: "当前用户是否已完成", example: "true / false", applicableTo: "Machine" },
 	{ field: "{{favorite}}", description: "是否已完成（同 isCompleted）", example: "true / false", applicableTo: "Machine" },
-	
+
 	// 所有权信息
 	{ field: "{{ownedUser}}", description: "是否拥有 User Flag", example: "true / false", applicableTo: "Machine" },
 	{ field: "{{ownedRoot}}", description: "是否拥有 Root Flag", example: "true / false", applicableTo: "Machine" },
 	{ field: "{{completedAt}}", description: "完成时间（如果已完成）", example: "2025-10-06 14:30", applicableTo: "Machine" },
-	
+
 	// 积分与统计
 	{ field: "{{points}}", description: "总积分", example: "20", applicableTo: "Machine" },
 	{ field: "{{staticPoints}}", description: "固定积分", example: "20", applicableTo: "Machine" },
@@ -650,28 +655,28 @@ export const TEMPLATE_FIELDS: TemplateField[] = [
 	{ field: "{{rootPoints}}", description: "Root Flag 积分", example: "30", applicableTo: "Machine" },
 	{ field: "{{userOwns}}", description: "User Flag 拥有者数量", example: "218", applicableTo: "Machine" },
 	{ field: "{{rootOwns}}", description: "Root Flag 拥有者数量", example: "196", applicableTo: "Machine" },
-	
+
 	// 时间信息
 	{ field: "{{release}}", description: "发布时间（完整时间戳）", example: "2020-11-14T17:00:00.000000Z", applicableTo: "Machine" },
 	{ field: "{{releaseDate}}", description: "发布日期", example: "2020-11-14", applicableTo: "Machine" },
 	{ field: "{{datePublished}}", description: "发布日期（同 releaseDate）", example: "2020-11-14", applicableTo: "Machine" },
 	{ field: "{{currentDate}}", description: "当前日期时间（UTC+8）", example: "2025-10-06 14:30", applicableTo: "Machine" },
 	{ field: "{{currentTime}}", description: "当前完整时间（UTC+8）", example: "2025-10-06 14:30:45", applicableTo: "Machine" },
-	
+
 	// 制作者信息
 	{ field: "{{author}}", description: "制作者（YAML 链接格式）", example: "- [0xc45](https://app.hackthebox.com/profile/73268)", applicableTo: "Machine" },
 	{ field: "{{maker}}", description: "制作者（同 author）", example: "- [0xc45](https://app.hackthebox.com/profile/73268)", applicableTo: "Machine" },
-	
+
 	// 图片与网络
 	{ field: "{{avatar}}", description: "机器封面图片 URL", example: "https://htb-mp-prod-public-storage.s3.eu-central-1.amazonaws.com/avatars/...", applicableTo: "Machine" },
 	{ field: "{{image}}", description: "封面图片 URL（同 avatar）", example: "https://...", applicableTo: "Machine" },
 	{ field: "{{imageUrl}}", description: "封面图片 URL（同 avatar）", example: "https://...", applicableTo: "Machine" },
 	{ field: "{{ip}}", description: "机器 IP 地址（需先启动）", example: "10.10.10.216", applicableTo: "Machine" },
-	
+
 	// 标签
 	{ field: "{{tags}}", description: "标签列表（逗号分隔）", example: "Linux, Web, SSH", applicableTo: "Machine" },
-	
-	
+
+
 	// ==================== Challenge 字段 ====================
 	// 基本信息
 	{ field: "{{id}}", description: "挑战 ID", example: "70", applicableTo: "Challenge" },
@@ -681,7 +686,7 @@ export const TEMPLATE_FIELDS: TemplateField[] = [
 	{ field: "{{url}}", description: "挑战详情页 URL", example: "https://app.hackthebox.com/challenges/70", applicableTo: "Challenge" },
 	{ field: "{{category}}", description: "挑战分类", example: "Reversing / Crypto / Stego / Pwn / Web / Misc / Forensics / Mobile / OSINT / Hardware", applicableTo: "Challenge" },
 	{ field: "{{categoryName}}", description: "分类名称（同 category）", example: "Misc", applicableTo: "Challenge" },
-	
+
 	// 难度与评分
 	{ field: "{{difficulty}}", description: "难度等级", example: "Easy / Medium / Hard", applicableTo: "Challenge" },
 	{ field: "{{difficultyText}}", description: "难度等级（同 difficulty）", example: "Medium", applicableTo: "Challenge" },
@@ -691,7 +696,7 @@ export const TEMPLATE_FIELDS: TemplateField[] = [
 	{ field: "{{score}}", description: "用户评分（同 rating）", example: "4.5", applicableTo: "Challenge" },
 	{ field: "{{stars}}", description: "星级评分（原始数值）", example: "4.5", applicableTo: "Challenge" },
 	{ field: "{{scoreStar}}", description: "星级评分（星星图标）", example: "⭐⭐⭐⭐⭐", applicableTo: "Challenge" },
-	
+
 	// 状态信息
 	{ field: "{{retired}}", description: "是否已退役", example: "true / false", applicableTo: "Challenge" },
 	{ field: "{{retiredStatus}}", description: "退役状态（同 retired）", example: "true / false", applicableTo: "Challenge" },
@@ -701,7 +706,7 @@ export const TEMPLATE_FIELDS: TemplateField[] = [
 	{ field: "{{favorite}}", description: "是否已收藏", example: "true / false", applicableTo: "Challenge" },
 	{ field: "{{isActive}}", description: "是否活跃", example: "true / false", applicableTo: "Challenge" },
 	{ field: "{{isTodo}}", description: "是否在待办列表", example: "true / false", applicableTo: "Challenge" },
-	
+
 	// 积分与统计
 	{ field: "{{points}}", description: "挑战积分", example: "30 / 60 / 80", applicableTo: "Challenge" },
 	{ field: "{{solves}}", description: "解题人数", example: "2260", applicableTo: "Challenge" },
@@ -709,7 +714,7 @@ export const TEMPLATE_FIELDS: TemplateField[] = [
 	{ field: "{{dislikes}}", description: "点踩数", example: "93", applicableTo: "Challenge" },
 	{ field: "{{likeByAuthUser}}", description: "当前用户是否点赞", example: "true / false", applicableTo: "Challenge" },
 	{ field: "{{dislikeByAuthUser}}", description: "当前用户是否点踩", example: "true / false", applicableTo: "Challenge" },
-	
+
 	// 时间信息
 	{ field: "{{releaseDate}}", description: "发布日期", example: "2019-06-13", applicableTo: "Challenge" },
 	{ field: "{{release}}", description: "发布日期（同 releaseDate）", example: "2019-06-13", applicableTo: "Challenge" },
@@ -717,7 +722,7 @@ export const TEMPLATE_FIELDS: TemplateField[] = [
 	{ field: "{{currentDate}}", description: "当前日期时间（UTC+8）", example: "2025-10-06 14:30", applicableTo: "Challenge" },
 	{ field: "{{currentTime}}", description: "当前完整时间（UTC+8）", example: "2025-10-06 14:30:45", applicableTo: "Challenge" },
 	{ field: "{{authUserSolveTime}}", description: "当前用户解题时间", example: "2025-10-06 14:30:45", applicableTo: "Challenge" },
-	
+
 	// 制作者信息
 	{ field: "{{author}}", description: "制作者（YAML 链接格式）", example: "- [sx02089](https://app.hackthebox.com/profile/7383)", applicableTo: "Challenge" },
 	{ field: "{{maker}}", description: "制作者（同 author）", example: "- [sx02089](https://app.hackthebox.com/profile/7383)", applicableTo: "Challenge" },
@@ -725,32 +730,32 @@ export const TEMPLATE_FIELDS: TemplateField[] = [
 	{ field: "{{creatorName}}", description: "制作者名称", example: "sx02089", applicableTo: "Challenge" },
 	{ field: "{{creatorAvatar}}", description: "制作者头像 URL", example: "/storage/avatars/...", applicableTo: "Challenge" },
 	{ field: "{{isRespected}}", description: "制作者是否受尊敬", example: "true / false", applicableTo: "Challenge" },
-	
+
 	// 首杀信息
 	{ field: "{{firstBloodUser}}", description: "首杀用户名", example: "xct", applicableTo: "Challenge" },
 	{ field: "{{firstBloodUserId}}", description: "首杀用户 ID", example: "13569", applicableTo: "Challenge" },
 	{ field: "{{firstBloodTime}}", description: "首杀用时", example: "01D 21H 52M", applicableTo: "Challenge" },
 	{ field: "{{firstBloodUserAvatar}}", description: "首杀用户头像 URL", example: "/storage/avatars/...", applicableTo: "Challenge" },
-	
+
 	// 图片与描述
 	{ field: "{{avatar}}", description: "挑战封面图片 URL", example: "https://...", applicableTo: "Challenge" },
 	{ field: "{{image}}", description: "封面图片 URL（同 avatar）", example: "https://...", applicableTo: "Challenge" },
 	{ field: "{{imageUrl}}", description: "封面图片 URL（同 avatar）", example: "https://...", applicableTo: "Challenge" },
 	{ field: "{{description}}", description: "挑战描述", example: "Some bits are missing", applicableTo: "Challenge" },
-	
+
 	// 下载信息
 	{ field: "{{download}}", description: "是否可下载", example: "true / false", applicableTo: "Challenge" },
 	{ field: "{{sha256}}", description: "下载文件 SHA256", example: "41a427e48b765325d40be361b312e1a727e8266b...", applicableTo: "Challenge" },
-	
+
 	// Docker 信息
 	{ field: "{{docker}}", description: "Docker 配置", example: "null 或配置对象", applicableTo: "Challenge" },
 	{ field: "{{dockerIp}}", description: "Docker IP", example: "10.10.10.1", applicableTo: "Challenge" },
 	{ field: "{{dockerPort}}", description: "Docker 端口", example: "1337", applicableTo: "Challenge" },
-	
+
 	// 其他
 	{ field: "{{recommended}}", description: "推荐标记", example: "0 / 1", applicableTo: "Challenge" },
-	
-	
+
+
 	// ==================== Sherlock 字段 ====================
 	// 基本信息
 	{ field: "{{id}}", description: "Sherlock ID", example: "631", applicableTo: "Sherlock" },
@@ -761,7 +766,7 @@ export const TEMPLATE_FIELDS: TemplateField[] = [
 	{ field: "{{category}}", description: "类别名称", example: "DFIR / Threat Intelligence / SOC", applicableTo: "Sherlock" },
 	{ field: "{{categoryName}}", description: "类别名称（同 category）", example: "DFIR", applicableTo: "Sherlock" },
 	{ field: "{{categoryId}}", description: "类别 ID", example: "14", applicableTo: "Sherlock" },
-	
+
 	// 难度与评分
 	{ field: "{{difficulty}}", description: "难度等级", example: "Very Easy / Easy / Medium / Hard / Insane", applicableTo: "Sherlock" },
 	{ field: "{{difficultyText}}", description: "难度等级（同 difficulty）", example: "Very Easy", applicableTo: "Sherlock" },
@@ -770,7 +775,7 @@ export const TEMPLATE_FIELDS: TemplateField[] = [
 	{ field: "{{stars}}", description: "星级评分（原始数值）", example: "4.657", applicableTo: "Sherlock" },
 	{ field: "{{scoreStar}}", description: "星级评分（星星图标）", example: "⭐⭐⭐⭐⭐", applicableTo: "Sherlock" },
 	{ field: "{{ratingCount}}", description: "评分人数", example: "1520", applicableTo: "Sherlock" },
-	
+
 	// 状态信息
 	{ field: "{{retired}}", description: "是否已退役", example: "true / false", applicableTo: "Sherlock" },
 	{ field: "{{retiredStatus}}", description: "退役状态（同 retired）", example: "true / false", applicableTo: "Sherlock" },
@@ -781,13 +786,13 @@ export const TEMPLATE_FIELDS: TemplateField[] = [
 	{ field: "{{favorite}}", description: "是否已收藏", example: "true / false", applicableTo: "Sherlock" },
 	{ field: "{{isTodo}}", description: "是否在待办列表", example: "true / false", applicableTo: "Sherlock" },
 	{ field: "{{pinned}}", description: "是否置顶", example: "true / false", applicableTo: "Sherlock" },
-	
+
 	// 统计信息
 	{ field: "{{solves}}", description: "完成人数", example: "23907", applicableTo: "Sherlock" },
 	{ field: "{{userOwnsCount}}", description: "完成人数（同 solves）", example: "23907", applicableTo: "Sherlock" },
 	{ field: "{{points}}", description: "积分", example: "100", applicableTo: "Sherlock" },
 	{ field: "{{progress}}", description: "当前用户进度", example: "0 / 1", applicableTo: "Sherlock" },
-	
+
 	// 时间信息
 	{ field: "{{releaseAt}}", description: "发布时间（完整时间戳）", example: "2024-04-04T17:00:00.000000Z", applicableTo: "Sherlock" },
 	{ field: "{{releaseDate}}", description: "发布日期", example: "2024-04-04", applicableTo: "Sherlock" },
@@ -795,24 +800,24 @@ export const TEMPLATE_FIELDS: TemplateField[] = [
 	{ field: "{{datePublished}}", description: "发布日期（同 releaseDate）", example: "2024-04-04", applicableTo: "Sherlock" },
 	{ field: "{{currentDate}}", description: "当前日期时间（UTC+8）", example: "2025-10-06 14:30", applicableTo: "Sherlock" },
 	{ field: "{{currentTime}}", description: "当前完整时间（UTC+8）", example: "2025-10-06 14:30:45", applicableTo: "Sherlock" },
-	
+
 	// 图片与描述
 	{ field: "{{avatar}}", description: "Sherlock 封面图片 URL", example: "/challenges/b7bb35b9c6ca2aee2df08cf09d7016c2.png", applicableTo: "Sherlock" },
 	{ field: "{{image}}", description: "封面图片 URL（同 avatar）", example: "https://...", applicableTo: "Sherlock" },
 	{ field: "{{imageUrl}}", description: "封面图片 URL（同 avatar）", example: "https://...", applicableTo: "Sherlock" },
 	{ field: "{{description}}", description: "场景描述（详细）", example: "In this very easy Sherlock, you will familiarize yourself with...", applicableTo: "Sherlock" },
 	{ field: "{{scenario}}", description: "场景描述（同 description）", example: "In this very easy Sherlock...", applicableTo: "Sherlock" },
-	
+
 	// 标签与资源
 	{ field: "{{tags}}", description: "标签列表（逗号分隔）", example: "Forensics, Incident Response, SSH, Linux", applicableTo: "Sherlock" },
 	{ field: "{{playMethods}}", description: "获取方式", example: "download", applicableTo: "Sherlock" },
-	
+
 	// 审查与VIP
 	{ field: "{{authUserHasReviewed}}", description: "当前用户是否已评价", example: "true / false", applicableTo: "Sherlock" },
 	{ field: "{{userCanReview}}", description: "当前用户是否可评价", example: "true / false", applicableTo: "Sherlock" },
 	{ field: "{{writeupVisible}}", description: "是否可查看 Writeup", example: "true / false", applicableTo: "Sherlock" },
 	{ field: "{{showGoVip}}", description: "是否显示 VIP 引导", example: "true / false", applicableTo: "Sherlock" },
-	
+
 	// 其他
 	{ field: "{{recommended}}", description: "推荐标记", example: "0 / 1", applicableTo: "Sherlock" },
 ];
@@ -890,7 +895,7 @@ export function createDefaultTypeTemplateSettings(
 ): TypeTemplateSettings {
 	const baseFolder = `HTB/${type}s`;
 	let templateContent = DEFAULT_MACHINE_TEMPLATE_CONTENT;
-	
+
 	switch (type) {
 		case 'Machine':
 			templateContent = DEFAULT_MACHINE_TEMPLATE_CONTENT;
@@ -902,7 +907,7 @@ export function createDefaultTypeTemplateSettings(
 			templateContent = DEFAULT_SHERLOCK_TEMPLATE_CONTENT;
 			break;
 	}
-	
+
 	return {
 		defaultDataFilePath: baseFolder,
 		defaultFileNameTemplate: "{{name}}",
@@ -930,7 +935,7 @@ export const DEFAULT_HTB_SETTINGS: HTBPluginSettings = {
 	useDefaultBuiltInTemplate: true,
 	defaultTemplateFile: "",
 	defaultTemplateContent: DEFAULT_TEMPLATE_CONTENT,
-	
+
 	// 文件夹模板规则（旧版兼容）
 	folderTemplateRules: [],
 	enableFolderTemplates: false,
@@ -955,5 +960,10 @@ export const DEFAULT_HTB_SETTINGS: HTBPluginSettings = {
 	// Advanced Settings
 	debug: false,
 	timeout: 30000,
+
+	// 记住
+	lastMachineFolderPath: "",
+	lastChallengeFolderPath: "",
+	lastSherlockFolderPath: "",
 };
 
