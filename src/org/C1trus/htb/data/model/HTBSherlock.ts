@@ -8,47 +8,47 @@ export interface HTBSherlock {
 	name: string;                  // Sherlock 名称
 	category: string;              // 分类 (通常是 Forensics 或 DFIR)
 	categoryId?: number;           // 分类ID
-	
+
 	// 难度信息
 	difficulty: string;            // 难度文本 (Very Easy/Easy/Medium/Hard)
 	difficultyNum: number;         // 难度数值 (10-100)
-	
+
 	// 评分信息
 	rating: number;                // 用户评分 (0-5)
 	stars: number;                 // 星级评分
 	likes?: number;                // 点赞数
 	dislikes?: number;             // 不喜欢数
 	ratingCount?: number;          // 评分人数
-	
+
 	// 图片
 	avatar: string;                // Sherlock 图标/封面
 	avatarThumb?: string;          // 缩略图
-	
+
 	// 时间信息
 	release: Date;                 // 发布日期
 	releaseDate?: string;          // 格式化的发布日期
 	retiredDate?: Date;            // 退役日期
-	
+
 	// 状态
 	state?: string;                // 状态（active / retired_free 等）
 	retired: boolean;              // 是否已退役
 	active?: boolean;              // 是否为活跃 Sherlock
-	
+
 	// 制作者信息
 	maker: {
 		id: string;
 		name: string;
 		avatar: string;
 	}[];
-	
+
 	// 标签和分类
 	tags: string[];                // 标签
 	labels?: string[];             // 标签（别名）
-	
+
 	// 积分
 	points: number;                // 完成后获得的积分
 	staticPoints?: number;         // 静态积分
-	
+
 	// 用户完成信息（需要登录）
 	isCompleted?: boolean;         // 是否已完成
 	isTodo?: boolean;              // 是否在 Todo 列表
@@ -56,27 +56,27 @@ export interface HTBSherlock {
 	completedAt?: Date;            // 完成时间（别名）
 	isSolved?: boolean;            // 是否已解决
 	progress?: number;             // 进度（0-100）
-	
+
 	// 首杀信息
 	firstBlood?: {                 // 首杀
 		user: string;
 		userId: string;
 		time: Date;
 	};
-	
+
 	// 统计信息
 	solves?: number;               // 解题数量
 	downloads?: number;            // 下载次数
-	
+
 	// 文件信息
 	hasDownload?: boolean;         // 是否有下载文件
 	downloadUrl?: string;          // 下载链接
 	playMethods?: string[];        // 游戏方式（download / container 等）
-	
+
 	// 描述信息
 	description?: string;          // Sherlock 描述
 	scenario?: string;             // 场景描述
-	
+
 	// 用户状态
 	authUserHasReviewed?: boolean; // 当前用户是否已评价
 	userCanReview?: boolean;       // 当前用户是否可评价
@@ -84,11 +84,23 @@ export interface HTBSherlock {
 	showGoVip?: boolean;           // 是否显示VIP购买引导
 	favorite?: boolean;            // 是否收藏
 	pinned?: boolean;              // 是否置顶
-	
+
 	// 其他
 	recommended?: number;          // 推荐度
 	retires?: string | null;       // 退役信息（null 或相关信息）
-	
+
+	// 题目信息
+	tasks?: {                      // 题目/问题列表
+		id: number;
+		title: string;
+		taskNum: number;
+		description: string;
+		hint?: string;             // 提示
+		completed?: boolean;       // 是否已完成
+		masked_flag?: string;      // 掩码后的 flag 格式
+	}[];
+	questionsCount?: number;       // 问题数量
+
 	// URL 信息
 	url?: string;                  // Sherlock 页面 URL
 }

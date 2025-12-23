@@ -13,7 +13,7 @@ export const HTB_API_ENDPOINTS = {
 	USER_INFO: '/user/info',                    // 获取用户信息
 	USER_ACTIVITY: '/user/activity',            // 用户活动
 	USER_PROFILE: '/user/profile/:id',          // 用户资料
-	
+
 	// 机器相关
 	MACHINE_LIST: '/machine/list',              // 机器列表
 	MACHINE_PROFILE: '/machine/profile/:id',    // 机器详情
@@ -23,24 +23,26 @@ export const HTB_API_ENDPOINTS = {
 	MACHINE_SPAWN: '/vm/spawn',                 // 启动机器
 	MACHINE_TERMINATE: '/vm/terminate',         // 终止机器
 	MACHINE_RESET: '/vm/reset',                 // 重置机器
-	
+
 	// 挑战相关
 	CHALLENGE_LIST: '/challenge/list',          // 挑战列表（活跃）
 	CHALLENGE_LIST_RETIRED: '/challenge/list/retired', // 挑战列表（已退役）
 	CHALLENGE_INFO: '/challenge/info/:id',      // 挑战详情
 	CHALLENGE_OWNS: '/challenge/owns',          // 已完成挑战
-	
+
 	// Sherlock 相关
 	SHERLOCK_LIST: '/sherlocks',                // Sherlock 列表（支持分页）
-	SHERLOCK_INFO: '/sherlocks/:id/info',       // Sherlock 详情（包含 description）
+	SHERLOCK_INFO: '/sherlocks/:id/info',       // Sherlock 详情（包含 description、maker、tags 等）
+	SHERLOCK_TASKS: '/sherlocks/:id/tasks',     // Sherlock 题目列表
+	SHERLOCK_PLAY: '/sherlocks/:id/play',       // Sherlock 启动/游戏信息
 	SHERLOCK_OWNS: '/sherlock/owns',            // 已完成 Sherlock
-	
+
 	// 搜索相关
 	SEARCH: '/search/fetch',                    // 搜索
-	
+
 	// 排行榜
 	LEADERBOARD: '/rankings/users',             // 用户排行榜
-	
+
 	// 其他
 	NOTIFICATIONS: '/notifications',             // 通知
 };

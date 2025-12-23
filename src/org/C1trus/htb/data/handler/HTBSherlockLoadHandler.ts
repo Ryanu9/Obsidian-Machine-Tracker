@@ -1,8 +1,8 @@
-import {HTBSherlock, HTBSherlockApiResponse, HTBSherlockSearchResult, HTBSherlockListApiResponse} from "../model/HTBSherlock";
-import {HTBHttpUtil} from "../../../utils/HTBHttpUtil";
-import {HTB_API_ENDPOINTS} from "../../../constant/HTB";
-import {log} from "../../../utils/Logutil";
-import {App, moment, Notice, normalizePath} from "obsidian";
+import { HTBSherlock, HTBSherlockApiResponse, HTBSherlockSearchResult, HTBSherlockListApiResponse } from "../model/HTBSherlock";
+import { HTBHttpUtil } from "../../../utils/HTBHttpUtil";
+import { HTB_API_ENDPOINTS } from "../../../constant/HTB";
+import { log } from "../../../utils/Logutil";
+import { App, moment, Notice, normalizePath } from "obsidian";
 import HTBPlugin from "../../../main";
 
 /**
@@ -11,12 +11,12 @@ import HTBPlugin from "../../../main";
 export default class HTBSherlockLoadHandler {
 	private app: App;
 	private plugin: HTBPlugin;
-	
+
 	constructor(app: App, plugin: HTBPlugin) {
 		this.app = app;
 		this.plugin = plugin;
 	}
-	
+
 	/**
 	 * 加载 Sherlock 信息
 	 * @param sherlockInput Sherlock ID 或名称
@@ -26,11 +26,11 @@ export default class HTBSherlockLoadHandler {
 		if (debug) {
 			console.log(`HTB Sherlock 处理器: 开始加载 Sherlock 信息 ${sherlockInput}`);
 		}
-		
+
 		try {
 			let sherlockId: string = sherlockInput;
 			let sherlockFromCache: HTBSherlockSearchResult | null = null;
-			
+
 			// 如果输入不是纯数字，先搜索获取 ID
 			if (!/^\d+$/.test(sherlockInput)) {
 				if (debug) {
@@ -57,70 +57,220 @@ export default class HTBSherlockLoadHandler {
 					console.log(`HTB Sherlock 处理器: 从缓存中找到 Sherlock ${sherlockId}`);
 				}
 			}
-			
-			// 优先使用缓存中的数据（列表 API 的数据更完整）
-			if (sherlockFromCache) {
-				if (debug) {
-					console.log(`HTB Sherlock 处理器: 使用缓存数据构建 Sherlock 对象`);
-				}
-				const sherlock = this.parseFromSearchResult(sherlockFromCache);
-				
-				// 获取详细描述（如果需要）
-				try {
-					const headers = {
-						'Authorization': `Bearer ${this.plugin.settings.apiToken}`
-					};
-					const apiUrl = HTBHttpUtil.buildApiUrl(HTB_API_ENDPOINTS.SHERLOCK_INFO, {id: sherlockId});
-					const response: HTBSherlockApiResponse = await HTBHttpUtil.get(apiUrl, headers, debug);
-					
-					if (response && response.data && response.data.description) {
-						sherlock.description = response.data.description;
-					}
-				} catch (e) {
-					// 如果获取描述失败（比如权限问题），仍然返回基本信息
-					if (debug) {
-						console.log(`HTB Sherlock 处理器: 获取描述失败，使用基本信息`, e);
-					}
-					// 显示错误消息到右上角
-					new Notice(`获取 Sherlock 描述失败: ${e.message}`);
-				}
-				
-				return sherlock;
-			}
-			
-			// 如果缓存中没有，调用详情 API（这种情况应该很少见）
+
 			const headers = {
 				'Authorization': `Bearer ${this.plugin.settings.apiToken}`
 			};
-			
-			const apiUrl = HTBHttpUtil.buildApiUrl(HTB_API_ENDPOINTS.SHERLOCK_INFO, {id: sherlockId});
-			
-			if (debug) {
-				console.log(`HTB Sherlock 处理器: 缓存中无数据，调用详情 API - ${apiUrl}`);
+
+			// 始终调用详情 API 获取完整信息（description、maker、tags 等）
+			let sherlock: HTBSherlock;
+
+			if (sherlockFromCache) {
+				// 使用缓存数据作为基础
+				sherlock = this.parseFromSearchResult(sherlockFromCache);
+			} else {
+				// 创建空的 Sherlock 对象
+				sherlock = {
+					id: sherlockId,
+					name: '',
+					category: '',
+					difficulty: '',
+					difficultyNum: 0,
+					rating: 0,
+					stars: 0,
+					avatar: '',
+					release: new Date(),
+					retired: false,
+					maker: [],
+					tags: [],
+					points: 0
+				};
 			}
-			
-			const response: HTBSherlockApiResponse = await HTBHttpUtil.get(apiUrl, headers, debug);
-			
-			if (debug) {
-				console.log('[HTBSherlockLoadHandler] API 完整响应:', response);
-			}
-			
-			if (response && response.data) {
-				const sherlock = this.parseFromApi(response.data);
+
+			// 调用 play API 获取 creators（作者）、scenario（场景描述）等信息
+			// API: /sherlocks/:id/play
+			try {
+				const playApiUrl = HTBHttpUtil.buildApiUrl(HTB_API_ENDPOINTS.SHERLOCK_PLAY, { id: sherlockId });
 				if (debug) {
-					console.log(`HTB Sherlock 处理器: 成功获取 Sherlock 信息 ${sherlock.name}`);
+					console.log(`HTB Sherlock 处理器: 获取 play 信息 - ${playApiUrl}`);
 				}
-				return sherlock;
+				const playResponse: any = await HTBHttpUtil.get(playApiUrl, headers, debug);
+
+				if (debug) {
+					console.log('[HTBSherlockLoadHandler] Play API 响应:', playResponse);
+				}
+
+				if (playResponse && playResponse.data) {
+					const data = playResponse.data;
+
+					// 更新 ID（如果有）
+					if (data.id) {
+						sherlock.id = data.id.toString();
+					}
+
+					// 获取场景描述 (scenario)
+					if (data.scenario) {
+						sherlock.scenario = data.scenario;
+						sherlock.description = data.scenario;  // 也填充到 description
+					}
+
+					// 获取作者信息 (creators)
+					if (data.creators && Array.isArray(data.creators)) {
+						sherlock.maker = data.creators.map((creator: any) => ({
+							id: creator.id?.toString() || '',
+							name: creator.name || '',
+							avatar: creator.avatar || ''
+						}));
+						if (debug) {
+							console.log(`HTB Sherlock 处理器: 获取到 ${sherlock.maker.length} 个作者:`, sherlock.maker);
+						}
+					}
+
+					// 获取文件信息
+					if (data.file_name) {
+						sherlock.hasDownload = true;
+						(sherlock as any).fileName = data.file_name;
+						(sherlock as any).fileSize = data.file_size || '';
+					}
+
+					// 获取 play_info
+					if (data.play_info) {
+						(sherlock as any).playInfo = data.play_info;
+					}
+				}
+			} catch (e) {
+				if (debug) {
+					console.log(`HTB Sherlock 处理器: 获取 play 信息失败`, e);
+				}
+				// 不阻止继续执行，仍然尝试获取其他信息
 			}
-			
-			return null;
+
+			// 同时尝试调用 info API 获取其他详情信息（如 tags、rating 等）
+			try {
+				const infoApiUrl = HTBHttpUtil.buildApiUrl(HTB_API_ENDPOINTS.SHERLOCK_INFO, { id: sherlockId });
+				if (debug) {
+					console.log(`HTB Sherlock 处理器: 获取 info 详情 - ${infoApiUrl}`);
+				}
+				const infoResponse: HTBSherlockApiResponse = await HTBHttpUtil.get(infoApiUrl, headers, debug);
+
+				if (debug) {
+					console.log('[HTBSherlockLoadHandler] Info API 响应:', infoResponse);
+				}
+
+				if (infoResponse && infoResponse.data) {
+					const data = infoResponse.data;
+					// 更新基本信息（优先使用 info API 的数据）
+					sherlock.name = data.name || sherlock.name;
+					if (data.description && !sherlock.description) {
+						sherlock.description = data.description;
+					}
+					sherlock.category = data.category_name || sherlock.category;
+					sherlock.categoryId = data.category_id;
+					sherlock.difficulty = data.difficulty || sherlock.difficulty;
+					sherlock.state = data.state || sherlock.state;
+					sherlock.retired = data.retired === true || data.state === 'retired_free';
+					sherlock.rating = data.rating || sherlock.rating;
+					sherlock.ratingCount = data.rating_count || sherlock.ratingCount;
+					sherlock.avatar = data.avatar || sherlock.avatar;
+					sherlock.solves = data.user_owns_count || sherlock.solves;
+					sherlock.releaseDate = data.release_at ? moment(data.release_at).utcOffset(8).format('YYYY-MM-DD HH:mm') : sherlock.releaseDate;
+					sherlock.playMethods = data.play_methods || sherlock.playMethods;
+					sherlock.isTodo = data.isTodo || sherlock.isTodo;
+					sherlock.favorite = data.favorite || sherlock.favorite;
+					sherlock.authUserHasReviewed = data.auth_user_has_reviewed || sherlock.authUserHasReviewed;
+					sherlock.userCanReview = data.user_can_review || sherlock.userCanReview;
+					sherlock.writeupVisible = data.writeup_visible || sherlock.writeupVisible;
+					sherlock.showGoVip = data.show_go_vip || sherlock.showGoVip;
+
+					// 解析标签
+					if (data.tags && Array.isArray(data.tags)) {
+						sherlock.tags = data.tags.map((tag: any) => tag.name || tag);
+						sherlock.labels = sherlock.tags;
+					}
+				}
+			} catch (e) {
+				if (debug) {
+					console.log(`HTB Sherlock 处理器: 获取 info 详情失败`, e);
+				}
+				// 不显示错误，因为 play API 可能已经获取到足够的信息
+			}
+
+			// 调用 tasks API 获取题目列表
+			try {
+				const tasksApiUrl = HTBHttpUtil.buildApiUrl(HTB_API_ENDPOINTS.SHERLOCK_TASKS, { id: sherlockId });
+				if (debug) {
+					console.log(`HTB Sherlock 处理器: 获取题目列表 - ${tasksApiUrl}`);
+				}
+				const tasksResponse: any = await HTBHttpUtil.get(tasksApiUrl, headers, debug);
+
+				if (debug) {
+					console.log('[HTBSherlockLoadHandler] Tasks API 响应:', tasksResponse);
+				}
+
+				if (tasksResponse) {
+					// 处理不同的响应格式
+					let tasksData: any[] = [];
+					if (Array.isArray(tasksResponse)) {
+						tasksData = tasksResponse;
+					} else if (tasksResponse.data && Array.isArray(tasksResponse.data)) {
+						tasksData = tasksResponse.data;
+					} else if (tasksResponse.tasks && Array.isArray(tasksResponse.tasks)) {
+						tasksData = tasksResponse.tasks;
+					}
+
+					if (tasksData.length > 0) {
+						sherlock.tasks = tasksData.map((task: any, index: number) => {
+							// 从 title 中提取任务编号（如 "Task 1" -> 1）
+							let taskNum = index + 1;
+							const titleMatch = task.title?.match(/Task\s*(\d+)/i);
+							if (titleMatch) {
+								taskNum = parseInt(titleMatch[1], 10);
+							}
+
+							return {
+								id: task.id || index + 1,
+								title: task.title || `Task ${index + 1}`,
+								taskNum: taskNum,
+								description: task.description || '',
+								hint: task.hint || undefined,
+								completed: task.completed || false,
+								masked_flag: task.masked_flag || undefined
+							};
+						});
+						sherlock.questionsCount = sherlock.tasks.length;
+
+						if (debug) {
+							console.log(`HTB Sherlock 处理器: 获取到 ${sherlock.tasks.length} 个题目`);
+						}
+					}
+				}
+			} catch (e) {
+				if (debug) {
+					console.log(`HTB Sherlock 处理器: 获取题目列表失败（可能需要 VIP 权限）`, e);
+				}
+				// 不显示错误，因为 tasks 可能需要 VIP 权限
+			}
+
+			// URL
+			sherlock.url = `https://app.hackthebox.com/sherlocks/${sherlock.id}`;
+
+			if (debug) {
+				console.log(`HTB Sherlock 处理器: 成功获取 Sherlock 信息`, {
+					id: sherlock.id,
+					name: sherlock.name,
+					maker: sherlock.maker,
+					tasksCount: sherlock.tasks?.length || 0
+				});
+			}
+
+			return sherlock;
 		} catch (e) {
 			log.error(`获取 HTB Sherlock 信息失败: ${sherlockInput}`, e);
 			new Notice(`获取 Sherlock 失败: ${e.message}`);
 			return null;
 		}
 	}
-	
+
 	/**
 	 * 搜索 Sherlock（新逻辑：先查缓存，无缓存则调用 API）
 	 * @param query 搜索关键词
@@ -130,23 +280,23 @@ export default class HTBSherlockLoadHandler {
 		if (debug) {
 			console.log(`HTB Sherlock 处理器: 搜索 Sherlock "${query}"`);
 		}
-		
+
 		try {
 			// 只从缓存中搜索，不自动请求 API
 			const cache = this.plugin.settings.sherlockCache || [];
 			const searchLower = query.toLowerCase();
-			
+
 			// 在缓存中查找匹配项
-			const cachedResults = cache.filter((item: HTBSherlockSearchResult) => 
+			const cachedResults = cache.filter((item: HTBSherlockSearchResult) =>
 				item.name.toLowerCase().includes(searchLower) ||
 				item.id.toString().includes(query) ||
 				item.category_name?.toLowerCase().includes(searchLower)
 			);
-			
+
 			if (debug) {
 				console.log(`HTB Sherlock 处理器: 缓存中找到 ${cachedResults.length} 个匹配项`);
 			}
-			
+
 			// 直接返回缓存中的结果（如果没有匹配就返回空数组）
 			return cachedResults;
 		} catch (e) {
@@ -154,7 +304,7 @@ export default class HTBSherlockLoadHandler {
 			throw e;
 		}
 	}
-	
+
 	/**
 	 * 从 API 获取所有 Sherlock（自动处理分页）
 	 */
@@ -163,33 +313,33 @@ export default class HTBSherlockLoadHandler {
 		const allSherlocks: HTBSherlockSearchResult[] = [];
 		let currentPage = 1;
 		let hasMorePages = true;
-		
+
 		try {
 			const headers = {
 				'Authorization': `Bearer ${this.plugin.settings.apiToken}`
 			};
-			
+
 			while (hasMorePages) {
 				const apiUrl = HTBHttpUtil.buildApiUrl(HTB_API_ENDPOINTS.SHERLOCK_LIST);
-				const queryString = HTBHttpUtil.buildQueryString({page: currentPage});
+				const queryString = HTBHttpUtil.buildQueryString({ page: currentPage });
 				const fullUrl = apiUrl + queryString;
-				
+
 				if (debug) {
 					console.log(`HTB Sherlock 处理器: 获取第 ${currentPage} 页 - ${fullUrl}`);
 				}
-				
+
 				const response: HTBSherlockListApiResponse = await HTBHttpUtil.get(fullUrl, headers, debug);
-				
+
 				if (response && response.data && Array.isArray(response.data)) {
 					allSherlocks.push(...response.data);
-					
+
 					// 检查是否还有更多页
 					if (response.meta && response.meta.current_page < response.meta.last_page) {
 						currentPage++;
 					} else {
 						hasMorePages = false;
 					}
-					
+
 					if (debug && response.meta) {
 						console.log(`分页信息: ${response.meta.current_page}/${response.meta.last_page}, 本页: ${response.data.length} 个, 总计: ${allSherlocks.length} 个`);
 					}
@@ -197,40 +347,40 @@ export default class HTBSherlockLoadHandler {
 					hasMorePages = false;
 				}
 			}
-			
+
 			if (debug) {
 				console.log(`HTB Sherlock 处理器: 共获取 ${allSherlocks.length} 个 Sherlock`);
 			}
-			
+
 			return allSherlocks;
 		} catch (e) {
 			log.error('从 API 获取 Sherlock 列表失败', e);
 			throw e;
 		}
 	}
-	
+
 	/**
 	 * 更新 Sherlock 缓存
 	 */
 	private async updateSherlockCache(sherlocks: HTBSherlockSearchResult[]): Promise<void> {
 		const debug = this.plugin.settings.debug;
-		
+
 		try {
 			// 合并新获取的 Sherlock 到缓存
 			const existingCache = this.plugin.settings.sherlockCache || [];
 			const existingIds = new Set(existingCache.map((item: HTBSherlockSearchResult) => item.id));
-			
+
 			// 添加新的 Sherlock（去重）
 			const newSherlocks = sherlocks.filter(item => !existingIds.has(item.id));
 			const updatedCache = [...existingCache, ...newSherlocks];
-			
+
 			// 更新设置
 			this.plugin.settings.sherlockCache = updatedCache;
 			this.plugin.settings.sherlockCacheTime = Date.now();
-			
+
 			// 保存设置到 data.json
 			await this.plugin.saveSettings();
-			
+
 			if (debug) {
 				console.log(`HTB Sherlock 处理器: 缓存已更新，共 ${updatedCache.length} 个 Sherlock（新增 ${newSherlocks.length} 个）`);
 			}
@@ -238,37 +388,37 @@ export default class HTBSherlockLoadHandler {
 			log.error('更新 Sherlock 缓存失败', e);
 		}
 	}
-	
+
 	/**
 	 * 刷新 Sherlock 缓存（强制从 API 重新获取所有数据）
 	 * 用于搜索无结果时手动刷新
 	 */
 	async refreshCache(): Promise<void> {
 		const debug = this.plugin.settings.debug;
-		
+
 		if (debug) {
 			console.log('HTB Sherlock 处理器: 开始刷新 Sherlock 缓存');
 		}
-		
+
 		try {
 			// 从 API 获取所有 Sherlock
 			const allSherlocks = await this.fetchAllSherlocksFromApi();
-			
+
 			if (debug) {
 				console.log(`HTB Sherlock 处理器: 从 API 获取到 ${allSherlocks.length} 个 Sherlock`);
 			}
-			
+
 			// 完全替换缓存（不是合并）
 			this.plugin.settings.sherlockCache = allSherlocks;
 			this.plugin.settings.sherlockCacheTime = Date.now();
-			
+
 			// 保存设置
 			await this.plugin.saveSettings();
-			
+
 			if (debug) {
 				console.log(`HTB Sherlock 处理器: 缓存刷新成功，共 ${allSherlocks.length} 个 Sherlock`);
 			}
-			
+
 			new Notice(`已保存 ${allSherlocks.length} 个 Sherlock 列表信息到缓存`);
 		} catch (e) {
 			log.error('刷新 Sherlock 缓存失败', e);
@@ -276,41 +426,41 @@ export default class HTBSherlockLoadHandler {
 			throw e;
 		}
 	}
-	
+
 	/**
 	 * 生成内容
 	 */
 	async generateContent(sherlock: HTBSherlock, targetPath: string): Promise<string> {
 		let template: string;
-		
+
 		const matchedTemplate = await this.getMatchedTemplate(targetPath);
 		if (matchedTemplate) {
 			template = matchedTemplate;
 		} else {
 			template = await this.getDefaultTemplate();
 		}
-		
+
 		return this.fillTemplate(template, sherlock);
 	}
-	
+
 	/**
 	 * 获取当前类型的模板配置
 	 */
 	private getTemplateSettings() {
 		return this.plugin.settings.sherlockTemplate;
 	}
-	
+
 	/**
 	 * 获取默认模板
 	 */
 	private async getDefaultTemplate(): Promise<string> {
 		const templateSettings = this.getTemplateSettings();
-		
+
 		// 优先使用类型特定的模板内容
 		if (templateSettings?.defaultTemplateContent && templateSettings.defaultTemplateContent.trim() !== '') {
 			return templateSettings.defaultTemplateContent;
 		}
-		
+
 		// 尝试加载类型特定的模板文件
 		if (templateSettings?.defaultTemplateFile && templateSettings.defaultTemplateFile.trim() !== '') {
 			const fileTemplate = await this.loadTemplate(templateSettings.defaultTemplateFile);
@@ -318,13 +468,13 @@ export default class HTBSherlockLoadHandler {
 				return fileTemplate;
 			}
 		}
-		
+
 		// 回退到全局默认模板内容
 		const settings = this.plugin.settings;
 		if (settings.defaultTemplateContent && settings.defaultTemplateContent.trim() !== '') {
 			return settings.defaultTemplateContent;
 		}
-		
+
 		// 回退到全局默认模板文件
 		if (settings.defaultTemplateFile && settings.defaultTemplateFile.trim() !== '') {
 			const fileTemplate = await this.loadTemplate(settings.defaultTemplateFile);
@@ -332,11 +482,11 @@ export default class HTBSherlockLoadHandler {
 				return fileTemplate;
 			}
 		}
-		
+
 		// 最后使用内置的类型默认模板
 		return this.getDefaultSherlockTemplate();
 	}
-	
+
 	/**
 	 * 获取内置 Sherlock 默认模板
 	 */
@@ -449,13 +599,13 @@ url: {{url}}
 | **退役信息** | {{retires}} |
 `;
 	}
-	
+
 	/**
 	 * 根据文件路径获取匹配的模板
 	 */
 	private async getMatchedTemplate(targetPath: string): Promise<string | null> {
 		const templateSettings = this.getTemplateSettings();
-		
+
 		// 优先使用类型特定的文件夹规则
 		if (templateSettings?.folderTemplateRules && templateSettings.folderTemplateRules.length > 0) {
 			const typeSpecificTemplate = await this.matchFolderRules(targetPath, templateSettings.folderTemplateRules);
@@ -463,29 +613,29 @@ url: {{url}}
 				return typeSpecificTemplate;
 			}
 		}
-		
+
 		// 回退到全局文件夹规则
 		const settings = this.plugin.settings;
 		if (settings.folderTemplateRules && settings.folderTemplateRules.length > 0) {
 			return await this.matchFolderRules(targetPath, settings.folderTemplateRules);
 		}
-		
+
 		return null;
 	}
-	
+
 	/**
 	 * 匹配文件夹规则
 	 */
 	private async matchFolderRules(targetPath: string, rules: any[]): Promise<string | null> {
 		const normalizedPath = targetPath.replace(/\\/g, '/').toLowerCase();
-		
+
 		const sortedRules = [...rules]
 			.filter(rule => rule.enabled)
 			.sort((a, b) => b.priority - a.priority);
-		
+
 		for (const rule of sortedRules) {
 			const folderPattern = rule.folderPath.replace(/\\/g, '/').toLowerCase();
-			
+
 			if (normalizedPath.includes(folderPattern)) {
 				// 找到匹配的规则，加载模板
 				// 如果规则启用了内置模板
@@ -504,7 +654,7 @@ url: {{url}}
 					// 3. 都没有，返回 null 使用默认模板
 					return null;
 				}
-				
+
 				// 如果未启用内置模板，使用外部模板文件
 				if (rule.templateFile && rule.templateFile.trim() !== '') {
 					const template = await this.loadTemplate(rule.templateFile);
@@ -515,15 +665,15 @@ url: {{url}}
 					log.warn(`规则 "${rule.name}" 的外部模板加载失败，将使用默认模板`);
 					return null;
 				}
-				
+
 				// 规则未配置任何模板，返回 null 使用默认模板
 				return null;
 			}
 		}
-		
+
 		return null;
 	}
-	
+
 	/**
 	 * 从文件加载模板
 	 */
@@ -531,12 +681,12 @@ url: {{url}}
 		try {
 			const normalizedPath = normalizePath(templatePath);
 			const file = this.app.metadataCache.getFirstLinkpathDest(normalizedPath, "");
-			
+
 			if (!file) {
 				log.error(`模板文件不存在: ${templatePath}`, new Error('File not found'));
 				return null;
 			}
-			
+
 			const content = await this.app.vault.cachedRead(file);
 			return content;
 		} catch (e) {
@@ -544,13 +694,13 @@ url: {{url}}
 			return null;
 		}
 	}
-	
+
 	/**
 	 * 填充模板
 	 */
 	private fillTemplate(template: string, sherlock: HTBSherlock): string {
 		let content = template;
-		
+
 		// 基本信息
 		content = content.replace(/\{\{id\}\}/g, sherlock.id || '');
 		content = content.replace(/\{\{title\}\}/g, sherlock.name || '');
@@ -559,47 +709,47 @@ url: {{url}}
 		content = content.replace(/\{\{category\}\}/g, 'Forensics');
 		content = content.replace(/\{\{categoryId\}\}/g, sherlock.categoryId?.toString() || '');
 		content = content.replace(/\{\{categoryName\}\}/g, sherlock.category || 'DFIR');
-		
+
 		// 难度信息
 		content = content.replace(/\{\{difficulty\}\}/g, sherlock.difficulty || '');
 		content = content.replace(/\{\{difficultyText\}\}/g, sherlock.difficulty || '');
-		
+
 		// 评分信息
 		content = content.replace(/\{\{rating\}\}/g, sherlock.rating?.toString() || '0');
 		content = content.replace(/\{\{score\}\}/g, sherlock.rating?.toFixed(1) || '0.0');
 		content = content.replace(/\{\{scoreStar\}\}/g, '⭐'.repeat(Math.round(sherlock.stars || 0)));
 		content = content.replace(/\{\{stars\}\}/g, sherlock.stars?.toString() || '0');
 		content = content.replace(/\{\{ratingCount\}\}/g, sherlock.ratingCount?.toString() || '0');
-		
+
 		// 图片
 		content = content.replace(/\{\{imageUrl\}\}/g, sherlock.avatar || '');
 		content = content.replace(/\{\{avatar\}\}/g, sherlock.avatar || '');
-		
+
 		// 时间信息（UTC+8格式）
 		const currentDate = moment().utcOffset(8).format('YYYY-MM-DD HH:mm');
 		const currentTime = moment().utcOffset(8).format('YYYY-MM-DD HH:mm:ss');
 		content = content.replace(/\{\{currentDate\}\}/g, currentDate);
 		content = content.replace(/\{\{currentTime\}\}/g, currentTime);
-		
+
 		// releaseAt 和 releaseDate 使用相同的值（UTC+8格式）
 		const releaseAt = sherlock.releaseDate || (sherlock.release ? moment(sherlock.release).utcOffset(8).format('YYYY-MM-DD HH:mm') : '');
 		content = content.replace(/\{\{releaseAt\}\}/g, releaseAt);
 		content = content.replace(/\{\{releaseDate\}\}/g, releaseAt);
 		content = content.replace(/\{\{datePublished\}\}/g, releaseAt);
 		content = content.replace(/\{\{release\}\}/g, releaseAt);
-		
+
 		// 制作者信息
 		const authors = sherlock.maker?.map(m => `- [${m.name}](https://app.hackthebox.com/profile/${m.id})`).join('\n') || '';
 		content = content.replace(/\{\{author\}\}/g, authors);
 		content = content.replace(/\{\{maker\}\}/g, authors);
-		
+
 		// 积分
 		content = content.replace(/\{\{points\}\}/g, sherlock.points?.toString() || '0');
-		
+
 		// 统计信息
 		content = content.replace(/\{\{solves\}\}/g, sherlock.solves?.toString() || '0');
 		content = content.replace(/\{\{userOwnsCount\}\}/g, sherlock.solves?.toString() || '0');
-		
+
 		// 状态信息
 		content = content.replace(/\{\{state\}\}/g, sherlock.state || (sherlock.retired ? 'retired_free' : 'active'));
 		content = content.replace(/\{\{retired\}\}/g, sherlock.retired ? '是' : '否');
@@ -608,7 +758,7 @@ url: {{url}}
 		content = content.replace(/\{\{completed\}\}/g, sherlock.isCompleted ? '是' : '否');
 		content = content.replace(/\{\{solved\}\}/g, sherlock.isSolved ? '是' : '否');
 		content = content.replace(/\{\{isTodo\}\}/g, sherlock.isTodo ? '是' : '否');
-		
+
 		// 进度和状态
 		content = content.replace(/\{\{progress\}\}/g, sherlock.progress?.toString() || '0');
 		content = content.replace(/\{\{authUserHasReviewed\}\}/g, sherlock.authUserHasReviewed ? '是' : '否');
@@ -617,43 +767,82 @@ url: {{url}}
 		content = content.replace(/\{\{showGoVip\}\}/g, sherlock.showGoVip ? '是' : '否');
 		content = content.replace(/\{\{favorite\}\}/g, sherlock.favorite ? '是' : '否');
 		content = content.replace(/\{\{pinned\}\}/g, sherlock.pinned ? '是' : '否');
-		
+
 		// 场景描述
 		content = content.replace(/\{\{scenario\}\}/g, sherlock.scenario || sherlock.description || '');
 		content = content.replace(/\{\{description\}\}/g, sherlock.description || '');
-		
+
 		// 标签
 		const tagsStr = sherlock.tags?.join(', ') || '';
 		content = content.replace(/\{\{tags\}\}/g, tagsStr);
-		
+
 		// 游戏方式
 		const playMethods = sherlock.playMethods?.join(', ') || '';
 		content = content.replace(/\{\{playMethods\}\}/g, playMethods);
-		
+
 		// 退役信息（retires）
 		content = content.replace(/\{\{retires\}\}/g, sherlock.retires || '');
 		content = content.replace(/\{\{retiresName\}\}/g, '');
 		content = content.replace(/\{\{retiresDifficulty\}\}/g, '');
 		content = content.replace(/\{\{retiresAvatar\}\}/g, '');
-		
+
+		// 题目信息
+		content = content.replace(/\{\{questionsCount\}\}/g, sherlock.questionsCount?.toString() || sherlock.tasks?.length?.toString() || '0');
+
+		// 格式化题目列表
+		if (sherlock.tasks && sherlock.tasks.length > 0) {
+			// 简洁格式：序号 + 问题描述
+			const tasksStr = sherlock.tasks.map((task) => {
+				return `${task.taskNum}. ${task.description}`;
+			}).join('\n\n');
+			content = content.replace(/\{\{tasks\}\}/g, tasksStr);
+
+			// 带标题的详细格式
+			const tasksDetailStr = sherlock.tasks.map((task) => {
+				const hint = task.hint ? `\n   > 💡 **Hint**: ${task.hint}` : '';
+				return `### ${task.title}\n${task.description}${hint}`;
+			}).join('\n\n');
+			content = content.replace(/\{\{tasksDetail\}\}/g, tasksDetailStr);
+
+			// 只有标题的简洁列表
+			const tasksTitleStr = sherlock.tasks.map((task) => {
+				return `${task.taskNum}. ${task.title}`;
+			}).join('\n');
+			content = content.replace(/\{\{tasksTitles\}\}/g, tasksTitleStr);
+		} else {
+			content = content.replace(/\{\{tasks\}\}/g, '');
+			content = content.replace(/\{\{tasksDetail\}\}/g, '');
+			content = content.replace(/\{\{tasksTitles\}\}/g, '');
+		}
+
+		// 详细制作者信息（单个）
+		const firstMaker = sherlock.maker && sherlock.maker.length > 0 ? sherlock.maker[0] : null;
+		content = content.replace(/\{\{creatorName\}\}/g, firstMaker?.name || '');
+		content = content.replace(/\{\{creatorId\}\}/g, firstMaker?.id || '');
+		content = content.replace(/\{\{creatorAvatar\}\}/g, firstMaker?.avatar || '');
+
+		// 纯文本格式的作者列表（用逗号分隔）
+		const authorsPlain = sherlock.maker?.map(m => m.name).join(', ') || '';
+		content = content.replace(/\{\{authorsPlain\}\}/g, authorsPlain);
+
 		// URL
 		const url = `https://app.hackthebox.com/sherlocks/${sherlock.id}`;
 		content = content.replace(/\{\{url\}\}/g, url);
-		
+
 		return content;
 	}
-	
+
 	/**
 	 * 从搜索结果构建 Sherlock 对象
 	 * 搜索结果包含完整的基本信息（name, difficulty, category 等）
 	 */
 	private parseFromSearchResult(searchResult: HTBSherlockSearchResult): HTBSherlock {
 		const debug = this.plugin.settings.debug;
-		
+
 		if (debug) {
 			console.log('[HTBSherlockLoadHandler] parseFromSearchResult:', searchResult);
 		}
-		
+
 		const sherlock: HTBSherlock = {
 			id: searchResult.id.toString(),
 			name: searchResult.name || '',
@@ -697,10 +886,10 @@ url: {{url}}
 			showGoVip: false,
 			retires: (searchResult as any).retires || null
 		};
-		
+
 		// URL
 		sherlock.url = `https://app.hackthebox.com/sherlocks/${sherlock.id}`;
-		
+
 		if (debug) {
 			console.log('[HTBSherlockLoadHandler] parseFromSearchResult 解析后:', {
 				id: sherlock.id,
@@ -711,10 +900,10 @@ url: {{url}}
 				solves: sherlock.solves
 			});
 		}
-		
+
 		return sherlock;
 	}
-	
+
 	/**
 	 * 从 API 响应解析数据
 	 */
@@ -724,7 +913,7 @@ url: {{url}}
 	 */
 	private parseFromApi(data: any): HTBSherlock {
 		const debug = this.plugin.settings.debug;
-		
+
 		if (debug) {
 			console.log('[HTBSherlockLoadHandler] parseFromApi 原始数据:', {
 				id: data.id,
@@ -737,7 +926,7 @@ url: {{url}}
 				rating: data.rating
 			});
 		}
-		
+
 		const sherlock: HTBSherlock = {
 			id: data.id?.toString() || '',
 			name: data.name || '',
@@ -780,16 +969,16 @@ url: {{url}}
 			showGoVip: data.show_go_vip || false,
 			retires: null
 		};
-		
+
 		// 解析标签
 		if (data.tags && Array.isArray(data.tags)) {
 			sherlock.tags = data.tags.map((tag: any) => tag.name || '');
 			sherlock.labels = sherlock.tags;
 		}
-		
+
 		// URL
 		sherlock.url = `https://app.hackthebox.com/sherlocks/${sherlock.id}`;
-		
+
 		if (debug) {
 			console.log('[HTBSherlockLoadHandler] parseFromApi 解析后:', {
 				id: sherlock.id,
@@ -801,10 +990,10 @@ url: {{url}}
 				tags: sherlock.tags
 			});
 		}
-		
+
 		return sherlock;
 	}
-	
+
 	/**
 	 * 获取 Sherlock 列表（支持分页）
 	 * API: GET /api/v4/sherlocks?page=1
@@ -814,55 +1003,55 @@ url: {{url}}
 		if (debug) {
 			console.log(`HTB Sherlock 处理器: 获取 Sherlock 列表 (retired: ${retired}, page: ${page})`);
 		}
-		
+
 		try {
 			const headers = {
 				'Authorization': `Bearer ${this.plugin.settings.apiToken}`
 			};
-			
+
 			// 构建 API URL
 			const apiUrl = HTBHttpUtil.buildApiUrl(HTB_API_ENDPOINTS.SHERLOCK_LIST);
-			const queryString = HTBHttpUtil.buildQueryString({page});
+			const queryString = HTBHttpUtil.buildQueryString({ page });
 			const fullUrl = apiUrl + queryString;
-			
+
 			if (debug) {
 				console.log('HTB Sherlock 列表 API URL:', fullUrl);
 			}
-			
+
 			const response = await HTBHttpUtil.get(fullUrl, headers, debug);
-			
+
 			if (debug) {
 				console.log('HTB Sherlock 列表 API 响应类型:', typeof response);
 				console.log('HTB Sherlock 列表 API 响应数据:', JSON.stringify(response).substring(0, 500));
 			}
-			
+
 			// API 返回格式: { data: [...], links: {...}, meta: {...} }
 			if (response && response.data && Array.isArray(response.data)) {
 				const sherlocks = response.data.map((item: any) => this.parseSherlockFromListApi(item));
-				
+
 				if (debug) {
 					console.log(`HTB Sherlock 处理器: 获取到 ${sherlocks.length} 个 Sherlock`);
 					if (response.meta) {
 						console.log(`分页信息: 当前页 ${response.meta.current_page}/${response.meta.last_page}, 总计 ${response.meta.total} 个`);
 					}
 				}
-				
+
 				return sherlocks;
 			}
-			
+
 			return [];
 		} catch (e) {
 			log.error('获取 HTB Sherlock 列表失败', e);
 			throw e;
 		}
 	}
-	
+
 	/**
 	 * 获取所有 Sherlock（优先使用缓存，无缓存时才调用 API）
 	 */
 	async getAllSherlocks(retired: boolean = false): Promise<HTBSherlock[]> {
 		const debug = this.plugin.settings.debug;
-		
+
 		// 1. 优先从缓存获取
 		const cache = this.plugin.settings.sherlockCache || [];
 		if (cache.length > 0) {
@@ -872,32 +1061,32 @@ url: {{url}}
 			// 将缓存项转换为完整的 HTBSherlock 对象
 			return cache.map((item: HTBSherlockSearchResult) => this.parseFromSearchResult(item));
 		}
-		
+
 		// 2. 缓存为空，从 API 获取所有 Sherlock
 		if (debug) {
 			console.log('HTB Sherlock 处理器: 缓存为空，从 API 获取所有 Sherlock');
 		}
-		
+
 		const allSherlocks: HTBSherlock[] = [];
 		let currentPage = 1;
 		let hasMorePages = true;
-		
+
 		try {
 			while (hasMorePages) {
 				const headers = {
 					'Authorization': `Bearer ${this.plugin.settings.apiToken}`
 				};
-				
+
 				const apiUrl = HTBHttpUtil.buildApiUrl(HTB_API_ENDPOINTS.SHERLOCK_LIST);
-				const queryString = HTBHttpUtil.buildQueryString({page: currentPage});
+				const queryString = HTBHttpUtil.buildQueryString({ page: currentPage });
 				const fullUrl = apiUrl + queryString;
-				
+
 				const response = await HTBHttpUtil.get(fullUrl, headers, debug);
-				
+
 				if (response && response.data && Array.isArray(response.data)) {
 					const sherlocks = response.data.map((item: any) => this.parseSherlockFromListApi(item));
 					allSherlocks.push(...sherlocks);
-					
+
 					// 检查是否还有更多页
 					if (response.meta && response.meta.current_page < response.meta.last_page) {
 						currentPage++;
@@ -908,11 +1097,11 @@ url: {{url}}
 					hasMorePages = false;
 				}
 			}
-			
+
 			if (debug) {
 				console.log(`HTB Sherlock 处理器: 共获取 ${allSherlocks.length} 个 Sherlock`);
 			}
-			
+
 			// 3. 更新缓存
 			const cacheItems: HTBSherlockSearchResult[] = allSherlocks.map(s => ({
 				id: parseInt(s.id),
@@ -927,21 +1116,21 @@ url: {{url}}
 				rating_count: s.ratingCount || 0,
 				solves: s.solves || 0
 			}));
-			
+
 			this.plugin.settings.sherlockCache = cacheItems;
 			await this.plugin.saveSettings();
-			
+
 			if (debug) {
 				console.log(`HTB Sherlock 处理器: 已更新缓存，共 ${cacheItems.length} 个 Sherlock`);
 			}
-			
+
 			return allSherlocks;
 		} catch (e) {
 			log.error('获取所有 HTB Sherlock 失败', e);
 			throw e;
 		}
 	}
-	
+
 	/**
 	 * 解析列表 API 返回的 Sherlock 数据
 	 * 列表 API 返回的字段比详情 API 多，包含完整信息
@@ -970,10 +1159,10 @@ url: {{url}}
 			ratingCount: data.rating_count || 0,
 			url: `https://app.hackthebox.com/sherlocks/${data.id}`
 		};
-		
+
 		return sherlock;
 	}
-	
+
 	/**
 	 * 解析难度字符串为数值
 	 */
